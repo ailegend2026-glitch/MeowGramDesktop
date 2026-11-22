@@ -1,0 +1,86 @@
+name: MeowGram Mac (Intel)
+
+# Personal-use branded fork of AyuGram Desktop.
+# Manual trigger only: builds are long, run them deliberately.
+on:
+  workflow_dispatch:
+
+jobs:
+  macos-intel:
+    name: MeowGram macOS Intel
+    runs-on: macos-15-intel
+
+    env:
+      PREPARE_PATH: "Telegram/build/prepare/prepare.py"
+
+    steps:
+      - name: Get repository name.
+        run: echo "REPO_NAME=${GITHUB_REPOSITORY##*/}" >> $GITHUB_ENV
+
+      - name: Clone.
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          path: ${{ env.REPO_NAME }}
+
+      - name: First set up.
+        run: |
+          brew update
+          brew upgrade || true
+          brew install automake libtool meson nasm ninja pkg-config
+
+          # Disable spotlight.
+          sudo mdutil -a -i off
+
+          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+
+          # Upstream tdesktop step, made prefix-safe for Intel Homebrew (/usr/local).
+          GNU_CMAKE="$(brew --prefix)/share/cmake/Modules/Compiler/GNU.cmake"
+          if [ -f "$GNU_CMAKE" ]; then
+            sudo sed -i '' '/CMAKE_${lang}_FLAGS_DEBUG_INIT/s/ -g//' "$GNU_CMAKE" || true
+          fi
+
+      - name: Libraries cache.
+        id: cache-libs
+        uses: actions/cache@v6
+        with:
+          path: |
+            Libraries
+            ThirdParty
+          key: ${{ runner.os }}-${{ runner.arch }}-libs-${{ hashFiles(format('{0}/{1}', env.REPO_NAME, env.PREPARE_PATH)) }}
+          restore-keys: ${{ runner.os }}-${{ runner.arch }}-libs-
+
+      - name: Libraries.
+        run: |
+          ./$REPO_NAME/Telegram/build/prepare/mac.sh skip-release silent
+
+      - name: Free up some disk space.
+        run: find Libraries '(' '(' ! '(' -name '*.a' -o -name '*.h' -o -name '*.hpp' -o -name '*.inc' -o -name '*.cmake' -o -name '*.pc' -o -path '*/include/*' -o -path '*/objects-*' -o -path '*/cache_keys/*' -o -path '*/patches/*' -o -perm +111 ')' -type f ')' -o -empty ')' -delete
+
+      - name: MeowGram build.
+        run: |
+          cd $REPO_NAME/Telegram
+
+          ./configure.sh \
+          -D CMAKE_CONFIGURATION_TYPES=Debug \
+          -D CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO \
+          -D TDESKTOP_API_ID=2040 \
+          -D TDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627 \
+          -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON \
+          -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON
+
+          cmake --build ../out --config Debug --parallel
+
+      - name: Package .dmg.
+        run: |
+          cd $REPO_NAME/out/Debug
+          mkdir -p artifact
+          mv MeowGram.app artifact/
+          hdiutil create -volname MeowGram -srcfolder artifact -ov -format UDZO "$GITHUB_WORKSPACE/MeowGram.dmg"
+
+      - name: Upload .dmg.
+        uses: actions/upload-artifact@v7
+        with:
+          name: MeowGram
+          path: MeowGram.dmg
+          retention-days: 7
