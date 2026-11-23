@@ -1085,12 +1085,26 @@ release:
     cmake --build . --config Release
     cmake --install . --config Release
 mac:
-    cmake . \\
-        -D CMAKE_OSX_ARCHITECTURES="x86_64;arm64" \\
-        -D CMAKE_INSTALL_PREFIX:STRING=$USED_PREFIX \\
+    mkdir build-x86_64
+    cd build-x86_64
+    cmake .. \\
+        -D CMAKE_OSX_ARCHITECTURES="x86_64" \\
+        -D CMAKE_INSTALL_PREFIX:STRING=$USED_PREFIX-x86_64 \\
         ${cmake_defines}
     cmake --build . --config MinSizeRel
     cmake --install . --config MinSizeRel
+    cd ..
+    mkdir build-arm64
+    cd build-arm64
+    cmake .. \\
+        -D CMAKE_OSX_ARCHITECTURES="arm64" \\
+        -D CMAKE_INSTALL_PREFIX:STRING=$USED_PREFIX-arm64 \\
+        ${cmake_defines}
+    cmake --build . --config MinSizeRel
+    cmake --install . --config MinSizeRel
+    cd ..
+    cp -R $USED_PREFIX-x86_64/. $USED_PREFIX/
+    find $USED_PREFIX-x86_64 -name '*.a' | while read f; do rel=${f#$USED_PREFIX-x86_64/}; lipo -create "$USED_PREFIX-x86_64/$rel" "$USED_PREFIX-arm64/$rel" -output "$USED_PREFIX/$rel"; done
 """)
 
 stage('libvpx', """
