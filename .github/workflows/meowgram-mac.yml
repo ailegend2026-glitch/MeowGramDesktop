@@ -12,6 +12,8 @@ jobs:
 
     env:
       PREPARE_PATH: "Telegram/build/prepare/prepare.py"
+      HOMEBREW_NO_AUTO_UPDATE: 1
+      HOMEBREW_NO_INSTALL_CLEANUP: 1
 
     steps:
       - name: Get repository name.
@@ -25,8 +27,8 @@ jobs:
 
       - name: First set up.
         run: |
-          brew update
-          brew upgrade || true
+          # No brew update/upgrade here: a full upgrade on the runner image
+          # stalled run #1 for ~4h. Installs use the runner's existing index.
           brew install automake libtool meson nasm ninja pkg-config
 
           # Disable spotlight.
