@@ -34,7 +34,11 @@ jobs:
           # Disable spotlight.
           sudo mdutil -a -i off
 
-          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          # The .icon (Icon Composer) app icons need the newest Xcode's actool;
+          # the image default (16.4) silently produces a generic placeholder icon.
+          LATEST_XCODE=$(ls -d /Applications/Xcode_*.app 2>/dev/null | sort -V | tail -n 1)
+          if [ -n "$LATEST_XCODE" ]; then sudo xcode-select -s "$LATEST_XCODE/Contents/Developer"; fi
+          xcodebuild -version
 
           # Upstream tdesktop step, made prefix-safe for Intel Homebrew (/usr/local).
           GNU_CMAKE="$(brew --prefix)/share/cmake/Modules/Compiler/GNU.cmake"
@@ -79,7 +83,11 @@ jobs:
       - name: First set up.
         run: |
           brew install automake libtool meson nasm ninja pkg-config
-          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          # The .icon (Icon Composer) app icons need the newest Xcode's actool;
+          # the image default (16.4) silently produces a generic placeholder icon.
+          LATEST_XCODE=$(ls -d /Applications/Xcode_*.app 2>/dev/null | sort -V | tail -n 1)
+          if [ -n "$LATEST_XCODE" ]; then sudo xcode-select -s "$LATEST_XCODE/Contents/Developer"; fi
+          xcodebuild -version
 
       - name: Libraries cache.
         uses: actions/cache/restore@v6
