@@ -8,7 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #import <Cocoa/Cocoa.h>
 #include <sys/xattr.h>
 
-NSString *appName = @"AyuGram.app";
+NSString *appName = @"MeowGram.app";
 NSString *appDir = nil;
 NSString *workDir = nil;
 
