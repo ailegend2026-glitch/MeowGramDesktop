@@ -2,12 +2,14 @@ name: MeowGram Mac (Intel)
 
 # Personal-use branded fork of AyuGram Desktop.
 # Manual trigger only: builds are long, run them deliberately.
+# Two jobs because a single job cannot exceed 6h: job 1 builds and caches
+# the libraries, job 2 restores them and builds the app Intel-only.
 on:
   workflow_dispatch:
 
 jobs:
-  macos-intel:
-    name: MeowGram macOS Intel
+  libraries:
+    name: MeowGram libraries
     runs-on: macos-15-intel
 
     env:
@@ -27,8 +29,6 @@ jobs:
 
       - name: First set up.
         run: |
-          # No brew update/upgrade here: a full upgrade on the runner image
-          # stalled run #1 for ~4h. Installs use the runner's existing index.
           brew install automake libtool meson nasm ninja pkg-config
 
           # Disable spotlight.
@@ -56,6 +56,40 @@ jobs:
         run: |
           ./$REPO_NAME/Telegram/build/prepare/mac.sh skip-release silent
 
+  build:
+    name: MeowGram macOS Intel
+    needs: libraries
+    runs-on: macos-15-intel
+
+    env:
+      PREPARE_PATH: "Telegram/build/prepare/prepare.py"
+      HOMEBREW_NO_AUTO_UPDATE: 1
+      HOMEBREW_NO_INSTALL_CLEANUP: 1
+
+    steps:
+      - name: Get repository name.
+        run: echo "REPO_NAME=${GITHUB_REPOSITORY##*/}" >> $GITHUB_ENV
+
+      - name: Clone.
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          path: ${{ env.REPO_NAME }}
+
+      - name: First set up.
+        run: |
+          brew install automake libtool meson nasm ninja pkg-config
+          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+
+      - name: Libraries cache.
+        uses: actions/cache/restore@v6
+        with:
+          path: |
+            Libraries
+            ThirdParty
+          key: ${{ runner.os }}-${{ runner.arch }}-libs-${{ hashFiles(format('{0}/{1}', env.REPO_NAME, env.PREPARE_PATH)) }}
+          fail-on-cache-miss: true
+
       - name: Free up some disk space.
         run: find Libraries '(' '(' ! '(' -name '*.a' -o -name '*.h' -o -name '*.hpp' -o -name '*.inc' -o -name '*.cmake' -o -name '*.pc' -o -path '*/include/*' -o -path '*/objects-*' -o -path '*/cache_keys/*' -o -path '*/patches/*' -o -perm +111 ')' -type f ')' -o -empty ')' -delete
 
@@ -65,6 +99,7 @@ jobs:
 
           ./configure.sh \
           -D CMAKE_CONFIGURATION_TYPES=Debug \
+          -D CMAKE_OSX_ARCHITECTURES=x86_64 \
           -D CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO \
           -D TDESKTOP_API_ID=2040 \
           -D TDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627 \
